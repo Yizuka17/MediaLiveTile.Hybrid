@@ -61,6 +61,15 @@
 				<desktop:Extension
 				  Category="windows.fullTrustProcess"
 				  Executable="MediaLiveTile.Hybrid.TrayHost\MediaLiveTile.Hybrid.TrayHost.exe" />
+				<desktop:Extension
+  Category="windows.startupTask"
+  Executable="MediaLiveTile.Hybrid.TrayHost\MediaLiveTile.Hybrid.TrayHost.exe"
+  EntryPoint="Windows.FullTrustApplication">
+					<desktop:StartupTask
+					  TaskId="TrayStartupTask"
+					  Enabled="false"
+					  DisplayName="MediaLiveTile Hybrid" />
+				</desktop:Extension>
 			</Extensions>
 		</Application>
 	</Applications>

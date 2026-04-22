@@ -17,23 +17,29 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
 {
     internal sealed class TrayMediaWatcherService
     {
-        private GlobalSystemMediaTransportControlsSessionManager? _manager;
+        private readonly TrayMonitoringStateService _monitoringStateService = new TrayMonitoringStateService();
+
+        private GlobalSystemMediaTransportControlsSessionManager _manager;
         private bool _initialized;
         private bool _isRefreshing;
         private bool _refreshPending;
 
-        private readonly List<GlobalSystemMediaTransportControlsSession> _subscribedSessions = new();
-        private CancellationTokenSource? _debounceCts;
+        private readonly List<GlobalSystemMediaTransportControlsSession> _subscribedSessions =
+            new List<GlobalSystemMediaTransportControlsSession>();
 
-        public event EventHandler? StateChanged;
+        private CancellationTokenSource _debounceCts;
 
-        public TrayMediaSelectionResult? LatestResult { get; private set; }
+        public event EventHandler StateChanged;
+
+        public TrayMediaSelectionResult LatestResult { get; private set; }
 
         public string StatusText { get; private set; } = "等待初始化";
 
         public DateTimeOffset? LastRefreshTime { get; private set; }
 
         public bool IsRefreshing => _isRefreshing;
+
+        public bool IsMonitoringPaused { get; private set; }
 
         public async Task InitializeAsync()
         {
@@ -47,13 +53,58 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
 
             RebuildSessionSubscriptions();
 
+            IsMonitoringPaused = _monitoringStateService.IsPaused();
+
             _initialized = true;
+
+            if (IsMonitoringPaused)
+            {
+                StatusText = "监测已暂停";
+                RaiseStateChanged();
+                return;
+            }
 
             await RefreshNowAsync();
         }
 
-        public async Task RefreshNowAsync()
+        public async Task SetMonitoringPausedAsync(bool paused)
         {
+            _monitoringStateService.SetPaused(paused);
+            await SyncMonitoringStateFromSettingsAsync();
+        }
+
+        public async Task SyncMonitoringStateFromSettingsAsync()
+        {
+            bool paused = _monitoringStateService.IsPaused();
+
+            if (paused == IsMonitoringPaused)
+                return;
+
+            IsMonitoringPaused = paused;
+
+            if (IsMonitoringPaused)
+            {
+                StatusText = "监测已暂停";
+                RaiseStateChanged();
+            }
+            else
+            {
+                StatusText = "监测已恢复";
+                RaiseStateChanged();
+
+                await RefreshNowAsync(true);
+            }
+        }
+
+        public async Task RefreshNowAsync(bool ignorePause = false)
+        {
+            if (IsMonitoringPaused && !ignorePause)
+            {
+                StatusText = "监测已暂停";
+                RaiseStateChanged();
+                return;
+            }
+
             if (_isRefreshing)
             {
                 _refreshPending = true;
@@ -75,9 +126,9 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
                 var sessions = _manager.GetSessions();
                 var currentSession = _manager.GetCurrentSession();
 
-                string? currentAppId = null;
-                string? currentTitle = null;
-                string? currentArtist = null;
+                string currentAppId = null;
+                string currentTitle = null;
+                string currentArtist = null;
 
                 if (currentSession != null)
                 {
@@ -117,7 +168,7 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
                             artist,
                             album);
 
-                        string? appIconUri = null;
+                        string appIconUri = null;
                         if (string.IsNullOrWhiteSpace(thumbnailUri))
                         {
                             appIconUri = await LoadAndCacheAppIconAsync(appId);
@@ -203,9 +254,16 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
                     SecondaryMedia = deduped.Count > 1 ? deduped[1] : null
                 };
 
-                StatusText = LatestResult.Count == 0
-                    ? "未检测到媒体会话"
-                    : $"已检测到 {LatestResult.Count} 个媒体会话";
+                if (IsMonitoringPaused)
+                {
+                    StatusText = "监测已暂停";
+                }
+                else
+                {
+                    StatusText = LatestResult.Count == 0
+                        ? "未检测到媒体会话"
+                        : $"已检测到 {LatestResult.Count} 个媒体会话";
+                }
 
                 LastRefreshTime = DateTimeOffset.Now;
             }
@@ -221,7 +279,7 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
                 if (_refreshPending)
                 {
                     _refreshPending = false;
-                    _ = RefreshNowAsync();
+                    _ = RefreshNowAsync(ignorePause);
                 }
             }
         }
@@ -231,7 +289,11 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
             SessionsChangedEventArgs args)
         {
             RebuildSessionSubscriptions();
-            QueueRefresh(250);
+
+            if (!IsMonitoringPaused)
+            {
+                QueueRefresh(250);
+            }
         }
 
         private void Manager_CurrentSessionChanged(
@@ -239,21 +301,31 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
             CurrentSessionChangedEventArgs args)
         {
             RebuildSessionSubscriptions();
-            QueueRefresh(250);
+
+            if (!IsMonitoringPaused)
+            {
+                QueueRefresh(250);
+            }
         }
 
         private void Session_MediaPropertiesChanged(
             GlobalSystemMediaTransportControlsSession sender,
             MediaPropertiesChangedEventArgs args)
         {
-            QueueRefresh(400);
+            if (!IsMonitoringPaused)
+            {
+                QueueRefresh(400);
+            }
         }
 
         private void Session_PlaybackInfoChanged(
             GlobalSystemMediaTransportControlsSession sender,
             PlaybackInfoChangedEventArgs args)
         {
-            QueueRefresh(300);
+            if (!IsMonitoringPaused)
+            {
+                QueueRefresh(300);
+            }
         }
 
         private void RebuildSessionSubscriptions()
@@ -291,10 +363,16 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
 
         private void QueueRefresh(int delayMilliseconds)
         {
+            if (IsMonitoringPaused)
+                return;
+
             try
             {
-                _debounceCts?.Cancel();
-                _debounceCts?.Dispose();
+                if (_debounceCts != null)
+                {
+                    _debounceCts.Cancel();
+                    _debounceCts.Dispose();
+                }
             }
             catch
             {
@@ -303,7 +381,7 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
             _debounceCts = new CancellationTokenSource();
             var token = _debounceCts.Token;
 
-            _ = Task.Run(async () =>
+            _ = Task.Run(async delegate
             {
                 try
                 {
@@ -323,12 +401,12 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
             }, token);
         }
 
-        private async Task<string?> LoadAndCacheThumbnailAsync(
-            IRandomAccessStreamReference? thumbnail,
-            string appId,
-            string title,
-            string artist,
-            string album)
+        private async Task<string> LoadAndCacheThumbnailAsync(
+    IRandomAccessStreamReference thumbnail,
+    string appId,
+    string title,
+    string artist,
+    string album)
         {
             if (thumbnail == null)
                 return null;
@@ -342,6 +420,11 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
                     artist,
                     album);
 
+                // 关键修复：同一路径文件已存在时，直接复用，不再覆盖
+                string existingUri = await TryGetExistingCachedUriAsync("TrayThumbCache", fileName);
+                if (!string.IsNullOrWhiteSpace(existingUri))
+                    return existingUri;
+
                 return await CacheStreamReferenceAsPngAsync(thumbnail, "TrayThumbCache", fileName);
             }
             catch
@@ -350,20 +433,26 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
             }
         }
 
-        private async Task<string?> LoadAndCacheAppIconAsync(string appUserModelId)
+        private async Task<string> LoadAndCacheAppIconAsync(string appUserModelId)
         {
             if (string.IsNullOrWhiteSpace(appUserModelId))
                 return null;
 
             try
             {
+                string fileName = CreateStablePngFileName("appicon", appUserModelId);
+
+                // 关键修复：应用图标如果已缓存，也直接复用
+                string existingUri = await TryGetExistingCachedUriAsync("TrayAppIconCache", fileName);
+                if (!string.IsNullOrWhiteSpace(existingUri))
+                    return existingUri;
+
                 var appInfo = AppInfo.GetFromAppUserModelId(appUserModelId);
                 if (appInfo != null)
                 {
                     var logoRef = appInfo.DisplayInfo.GetLogo(new Windows.Foundation.Size(128, 128));
                     if (logoRef != null)
                     {
-                        string fileName = CreateStablePngFileName("appicon", appUserModelId);
                         var localUri = await CacheStreamReferenceAsPngAsync(logoRef, "TrayAppIconCache", fileName);
                         if (!string.IsNullOrWhiteSpace(localUri))
                             return localUri;
@@ -377,51 +466,68 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
             return GetKnownAppIconUri(appUserModelId);
         }
 
-        private async Task<string?> CacheStreamReferenceAsPngAsync(
+        private async Task<string> TryGetExistingCachedUriAsync(string folderName, string fileName)
+        {
+            try
+            {
+                var folder = await ApplicationData.Current.LocalFolder.CreateFolderAsync(
+                    folderName,
+                    CreationCollisionOption.OpenIfExists);
+
+                var file = await folder.GetFileAsync(fileName);
+                return $"ms-appdata:///local/{folderName}/{file.Name}";
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        private async Task<string> CacheStreamReferenceAsPngAsync(
             IRandomAccessStreamReference streamReference,
             string folderName,
             string fileName)
         {
-            using var stream = await streamReference.OpenReadAsync();
-
-            var decoder = await BitmapDecoder.CreateAsync(stream);
-            var softwareBitmap = await decoder.GetSoftwareBitmapAsync(
-                BitmapPixelFormat.Bgra8,
-                BitmapAlphaMode.Premultiplied);
-
-            var folder = await ApplicationData.Current.LocalFolder.CreateFolderAsync(
-                folderName,
-                CreationCollisionOption.OpenIfExists);
-
-            var file = await folder.CreateFileAsync(
-                fileName,
-                CreationCollisionOption.ReplaceExisting);
-
-            using (var output = await file.OpenAsync(FileAccessMode.ReadWrite))
+            using (var stream = await streamReference.OpenReadAsync())
             {
-                var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, output);
-                encoder.SetSoftwareBitmap(softwareBitmap);
-                await encoder.FlushAsync();
+                var decoder = await BitmapDecoder.CreateAsync(stream);
+                var softwareBitmap = await decoder.GetSoftwareBitmapAsync(
+                    BitmapPixelFormat.Bgra8,
+                    BitmapAlphaMode.Premultiplied);
+
+                var folder = await ApplicationData.Current.LocalFolder.CreateFolderAsync(
+                    folderName,
+                    CreationCollisionOption.OpenIfExists);
+
+                var file = await folder.CreateFileAsync(
+                    fileName,
+                    CreationCollisionOption.ReplaceExisting);
+
+                using (var output = await file.OpenAsync(FileAccessMode.ReadWrite))
+                {
+                    var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, output);
+                    encoder.SetSoftwareBitmap(softwareBitmap);
+                    await encoder.FlushAsync();
+                }
+
+                softwareBitmap.Dispose();
+
+                return $"ms-appdata:///local/{folderName}/{file.Name}";
             }
-
-            softwareBitmap.Dispose();
-
-            return $"ms-appdata:///local/{folderName}/{file.Name}";
         }
 
         private string CreateStablePngFileName(string prefix, params string[] parts)
         {
-            string raw = string.Join("|", parts ?? Array.Empty<string>());
+            string raw = string.Join("|", parts ?? new string[0]);
             byte[] hash = MD5.HashData(Encoding.UTF8.GetBytes(raw));
             return $"{prefix}_{Convert.ToHexString(hash)}.png";
         }
 
-        private string? GetKnownAppIconUri(string appUserModelId)
+        private string GetKnownAppIconUri(string appUserModelId)
         {
             if (string.IsNullOrWhiteSpace(appUserModelId))
                 return null;
 
-            var id = appUserModelId.ToLowerInvariant();
+            string id = appUserModelId.ToLowerInvariant();
 
             if (id.StartsWith("1f8b0f94.122165ae053f")
                 || id.Contains("netease")
@@ -430,22 +536,26 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
                 return "ms-appx:///Assets/AppIcons/netease.png";
             }
 
-            return id switch
+            switch (id)
             {
-                "msedge.exe" => "ms-appx:///Assets/AppIcons/msedge.png",
-                "chrome.exe" => "ms-appx:///Assets/AppIcons/chrome.png",
-                "firefox.exe" => "ms-appx:///Assets/AppIcons/firefox.png",
-                _ => null
-            };
+                case "msedge.exe":
+                    return "ms-appx:///Assets/AppIcons/msedge.png";
+                case "chrome.exe":
+                    return "ms-appx:///Assets/AppIcons/chrome.png";
+                case "firefox.exe":
+                    return "ms-appx:///Assets/AppIcons/firefox.png";
+                default:
+                    return null;
+            }
         }
 
         private bool IsCurrentSession(
             string appId,
             string title,
             string artist,
-            string? currentAppId,
-            string? currentTitle,
-            string? currentArtist)
+            string currentAppId,
+            string currentTitle,
+            string currentArtist)
         {
             if (string.IsNullOrWhiteSpace(currentAppId))
                 return false;
@@ -508,7 +618,7 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
             return score;
         }
 
-        private bool HasRealValue(string? value, params string[] placeholders)
+        private bool HasRealValue(string value, params string[] placeholders)
         {
             if (string.IsNullOrWhiteSpace(value))
                 return false;
@@ -522,7 +632,7 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
             return true;
         }
 
-        private string Normalize(string? value)
+        private string Normalize(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
         }
@@ -561,7 +671,11 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
 
         private void RaiseStateChanged()
         {
-            StateChanged?.Invoke(this, EventArgs.Empty);
+            var handler = StateChanged;
+            if (handler != null)
+            {
+                handler(this, EventArgs.Empty);
+            }
         }
     }
 }

@@ -1,70 +1,59 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-  xmlns:uap7="http://schemas.microsoft.com/appx/manifest/uap/windows10/7"
-  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
-  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap mp uap7 desktop rescap">
+  IgnorableNamespaces="uap mp">
 
-  <Identity
-    Name="47eb1927-1260-4e64-9dee-d3595e5f5776"
-    Publisher="CN=SANSH"
-    Version="1.0.0.0" />
+	<Identity
+	  Name="47eb1927-1260-4e64-9dee-d3595e5f5776"
+	  Publisher="CN=SANSH"
+	  Version="1.0.0.0" />
+	<mp:PhoneIdentity PhoneProductId="47eb1927-1260-4e64-9dee-d3595e5f5776" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
-  <mp:PhoneIdentity PhoneProductId="47eb1927-1260-4e64-9dee-d3595e5f5776" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+	<Properties>
+		<DisplayName>MediaLiveTile.Hybrid</DisplayName>
+		<PublisherDisplayName>SANSH</PublisherDisplayName>
+		<Logo>Assets\StoreLogo.png</Logo>
+	</Properties>
 
-  <Properties>
-    <DisplayName>MediaLiveTile.Hybrid.Uwp</DisplayName>
-    <PublisherDisplayName>SANSH</PublisherDisplayName>
-    <Logo>Assets\StoreLogo.png</Logo>
-  </Properties>
+	<Dependencies>
+		<TargetDeviceFamily
+		  Name="Windows.Desktop"
+		  MinVersion="10.0.17763.0"
+		  MaxVersionTested="10.0.19041.0" />
+	</Dependencies>
 
-  <Dependencies>
-    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.0.0" MaxVersionTested="10.0.0.0" />
-  </Dependencies>
-
-  <Resources>
-    <Resource Language="x-generate"/>
-  </Resources>
+	<Resources>
+		<Resource Language="x-generate" />
+	</Resources>
 
 	<Applications>
 		<Application
 		  Id="App"
 		  Executable="$targetnametoken$.exe"
-		  EntryPoint="MediaLiveTile.Hybrid.Uwp.App">
+		  EntryPoint="$targetentrypoint$">
+
 			<uap:VisualElements
 			  DisplayName="MediaLiveTile.Hybrid"
 			  Square150x150Logo="Assets\Square150x150Logo.png"
 			  Square44x44Logo="Assets\Square44x44Logo.png"
-			  Description="MediaLiveTile.Hybrid.Uwp"
+			  Description="MediaLiveTile.Hybrid"
 			  BackgroundColor="transparent">
+
 				<uap:DefaultTile
 				  Wide310x150Logo="Assets\Wide310x150Logo.png"
 				  Square71x71Logo="Assets\Square71x71Logo.png"
 				  Square310x310Logo="Assets\Square310x310Logo.png" />
+
 				<uap:SplashScreen Image="Assets\SplashScreen.png" />
 			</uap:VisualElements>
 
-			<Extensions>
-				<uap:Extension Category="windows.protocol">
-					<uap:Protocol Name="medialivetilehybrid">
-						<uap:DisplayName>MediaLiveTile Hybrid</uap:DisplayName>
-					</uap:Protocol>
-				</uap:Extension>
-
-				<desktop:Extension
-				  Category="windows.fullTrustProcess"
-				  Executable="MediaLiveTile.Hybrid.TrayHost\MediaLiveTile.Hybrid.TrayHost.exe" />
-			</Extensions>
+			
 		</Application>
 	</Applications>
 
 	<Capabilities>
 		<Capability Name="internetClient" />
-		<uap7:Capability Name="globalMediaControl" />
-		<rescap:Capability Name="runFullTrust" />
 	</Capabilities>
 </Package>
