@@ -3,6 +3,10 @@
 - MediaLiveTile.Hybrid 是基于 **UWP + FullTrust TrayHost + MSIX Package** 的混合架构媒体动态磁贴工具。
 - 原uwp版本：https://github.com/Yizuka17/MediaLiveTile
 
+- 截图示例：<img width="2536" height="1377" alt="Snipaste_2026-04-23_12-15-38" src="https://github.com/user-attachments/assets/49f2ad9a-f9d6-4247-aac5-0dec8341917e" />
+
+
+
 本版本是 2.0 预览版，主要目标是解决 1.x 纯 UWP 架构下：
 
 - 无法稳定后台驻留
