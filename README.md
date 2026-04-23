@@ -1,7 +1,7 @@
 # MediaLiveTile.Hybrid v2.0.0.0-preview
 
-MediaLiveTile.Hybrid 是基于 **UWP + FullTrust TrayHost + MSIX Package** 的混合架构媒体动态磁贴工具。
-原uwp版本：https://github.com/Yizuka17/MediaLiveTile
+- MediaLiveTile.Hybrid 是基于 **UWP + FullTrust TrayHost + MSIX Package** 的混合架构媒体动态磁贴工具。
+- 原uwp版本：https://github.com/Yizuka17/MediaLiveTile
 
 本版本是 2.0 预览版，主要目标是解决 1.x 纯 UWP 架构下：
 
