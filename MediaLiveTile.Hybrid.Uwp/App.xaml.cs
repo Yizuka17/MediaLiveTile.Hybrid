@@ -1,7 +1,10 @@
-﻿using System;
+﻿using MediaLiveTile.Hybrid.Shared;
+using MediaLiveTile.Hybrid.Uwp.Services;
+using System;
 using System.Threading.Tasks;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
+using Windows.Storage;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
@@ -21,35 +24,41 @@ namespace MediaLiveTile.Hybrid.Uwp
         {
             var rootFrame = EnsureRootFrame();
 
+            bool trayHostLaunched = await EnsureTrayHostLaunchedAsync();
+            string launchInfo = trayHostLaunched
+                ? "普通启动"
+                : "托盘宿主未启动，部分功能不可用";
+
             if (rootFrame.Content == null)
             {
-                rootFrame.Navigate(typeof(MainPage), "普通启动");
+                rootFrame.Navigate(typeof(MainPage), launchInfo);
             }
 
             Window.Current.Activate();
-
-            await EnsureTrayHostLaunchedAsync();
         }
 
         protected override async void OnActivated(IActivatedEventArgs args)
         {
             var rootFrame = EnsureRootFrame();
 
+            bool trayHostLaunched = await EnsureTrayHostLaunchedAsync();
+            string trayStatus = trayHostLaunched
+                ? string.Empty
+                : "；托盘宿主未启动，部分功能不可用";
+
             if (args is ProtocolActivatedEventArgs protocolArgs)
             {
-                rootFrame.Navigate(typeof(MainPage), $"协议启动：{protocolArgs.Uri}");
+                rootFrame.Navigate(typeof(MainPage), $"协议启动：{protocolArgs.Uri}{trayStatus}");
             }
             else
             {
                 if (rootFrame.Content == null)
                 {
-                    rootFrame.Navigate(typeof(MainPage), $"激活类型：{args.Kind}");
+                    rootFrame.Navigate(typeof(MainPage), $"激活类型：{args.Kind}{trayStatus}");
                 }
             }
 
             Window.Current.Activate();
-
-            await EnsureTrayHostLaunchedAsync();
         }
 
         private Frame EnsureRootFrame()
@@ -66,25 +75,29 @@ namespace MediaLiveTile.Hybrid.Uwp
             return rootFrame;
         }
 
-        private async Task EnsureTrayHostLaunchedAsync()
+        private async Task<bool> EnsureTrayHostLaunchedAsync()
         {
             // 避免一次启动流程里重复请求
             if (_trayLaunchRequested)
-                return;
+                return !ApplicationData.Current.LocalSettings.Values.ContainsKey(
+                    SharedConstants.LocalSettingsKeys.TrayHostLaunchFailureMessage);
 
             _trayLaunchRequested = true;
 
             try
             {
                 await FullTrustProcessLauncher.LaunchFullTrustProcessForCurrentAppAsync();
+                ApplicationData.Current.LocalSettings.Values.Remove(
+                    SharedConstants.LocalSettingsKeys.TrayHostLaunchFailureMessage);
+                return true;
             }
-            catch
+            catch (Exception ex)
             {
-                // 常见情况：
-                // 1. 当前不是通过 Package 启动
-                // 2. TrayHost 已经启动
-                // 3. manifest / fullTrust 配置未正确生效
-                // 当前先静默，后面需要时可接日志
+                string message = "托盘宿主未启动，部分功能不可用";
+                ApplicationData.Current.LocalSettings.Values[
+                    SharedConstants.LocalSettingsKeys.TrayHostLaunchFailureMessage] = message + "：" + ex.Message;
+                UwpStateSnapshotService.BumpSyncStamp();
+                return false;
             }
         }
 

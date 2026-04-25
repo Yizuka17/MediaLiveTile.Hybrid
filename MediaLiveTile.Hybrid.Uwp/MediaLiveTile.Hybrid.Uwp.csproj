@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -24,8 +24,10 @@
     <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
     <GenerateTestArtifacts>True</GenerateTestArtifacts>
     <AppxBundle>Always</AppxBundle>
-    <AppxBundlePlatforms>x64</AppxBundlePlatforms>
+    <AppxBundlePlatforms>x86</AppxBundlePlatforms>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
     <DebugSymbols>true</DebugSymbols>
@@ -179,9 +181,12 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <SDKReference Include="WindowsDesktop, Version=10.0.19041.0">
-      <Name>Windows Desktop Extensions for the UWP %28WindowsDesktop, Version=10.0.19041.0%29</Name>
-    </SDKReference>
+    <ProjectReference Include="..\MediaLiveTile.Hybrid.Shared\MediaLiveTile.Hybrid.Shared.csproj">
+      <Project>{A16F4892-99D0-4FD5-85FD-5EE557D556C9}</Project>
+      <Name>MediaLiveTile.Hybrid.Shared</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
     <SDKReference Include="WindowsDesktop, Version=10.0.22621.0">
       <Name>Windows Desktop Extensions for the UWP %28WindowsDesktop, Version=10.0.22621.0%29</Name>
     </SDKReference>

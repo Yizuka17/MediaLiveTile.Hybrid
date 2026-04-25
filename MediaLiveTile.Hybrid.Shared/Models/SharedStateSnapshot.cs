@@ -1,10 +1,10 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 
-namespace MediaLiveTile.Hybrid.Uwp.Models
+namespace MediaLiveTile.Hybrid.Shared.Models
 {
     [DataContract]
-    public sealed class UwpStateSnapshot
+    public sealed class SharedStateSnapshot
     {
         [DataMember(Order = 1)]
         public string StatusText { get; set; } = string.Empty;
@@ -19,12 +19,12 @@ namespace MediaLiveTile.Hybrid.Uwp.Models
         public long LastRefreshUnixTimeMilliseconds { get; set; }
 
         [DataMember(Order = 5)]
-        public UwpStateSessionItem? PrimaryMedia { get; set; }
+        public SharedStateSessionItem? PrimaryMedia { get; set; }
 
         [DataMember(Order = 6)]
-        public UwpStateSessionItem? SecondaryMedia { get; set; }
+        public SharedStateSessionItem? SecondaryMedia { get; set; }
 
         [DataMember(Order = 7)]
-        public List<UwpStateSessionItem> Sessions { get; set; } = new List<UwpStateSessionItem>();
+        public List<SharedStateSessionItem> Sessions { get; set; } = new List<SharedStateSessionItem>();
     }
 }

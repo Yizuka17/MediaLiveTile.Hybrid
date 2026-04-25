@@ -1,6 +1,7 @@
-﻿using MediaLiveTile.Hybrid.TrayHost.Models;
+﻿using MediaLiveTile.Hybrid.Shared;
+using MediaLiveTile.Hybrid.Shared.Models;
+using MediaLiveTile.Hybrid.TrayHost.Models;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Runtime.Serialization.Json;
@@ -12,13 +13,14 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
 {
     internal sealed class TrayStateSnapshotService
     {
-        private const string SnapshotFolderName = "Shared";
-        private const string SnapshotFileName = "CurrentState.json";
-        private const string StateSnapshotSyncStampKey = "StateSnapshotSyncStamp";
+        private static readonly string SnapshotFolderName = SharedConstants.StateSnapshot.FolderName;
+        private static readonly string SnapshotFileName = SharedConstants.StateSnapshot.FileName;
+        private static readonly string SnapshotTempFileName = SharedConstants.StateSnapshot.TempFileName;
+        private static readonly string StateSnapshotSyncStampKey = SharedConstants.LocalSettingsKeys.StateSnapshotSyncStamp;
 
         public static long GetSyncStamp()
         {
-            object raw = ApplicationData.Current.LocalSettings.Values[StateSnapshotSyncStampKey];
+            object? raw = ApplicationData.Current.LocalSettings.Values[StateSnapshotSyncStampKey];
 
             if (raw is long longValue)
                 return longValue;
@@ -31,7 +33,7 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
 
         public static long BumpSyncStamp()
         {
-            long stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            long stamp = GetSyncStamp() + 1;
             ApplicationData.Current.LocalSettings.Values[StateSnapshotSyncStampKey] = stamp;
             return stamp;
         }
@@ -52,30 +54,65 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
                 SnapshotFolderName,
                 CreationCollisionOption.OpenIfExists);
 
-            var file = await folder.CreateFileAsync(
-                SnapshotFileName,
+            var tempFile = await folder.CreateFileAsync(
+                SnapshotTempFileName,
                 CreationCollisionOption.ReplaceExisting);
 
-            var serializer = new DataContractJsonSerializer(typeof(TrayStateSnapshot));
+            var serializer = new DataContractJsonSerializer(typeof(SharedStateSnapshot));
 
-            using (IRandomAccessStream randomAccessStream = await file.OpenAsync(FileAccessMode.ReadWrite))
+            using (IRandomAccessStream randomAccessStream = await tempFile.OpenAsync(FileAccessMode.ReadWrite))
             using (var stream = randomAccessStream.AsStreamForWrite())
             {
                 stream.SetLength(0);
                 serializer.WriteObject(stream, snapshot);
                 await stream.FlushAsync();
+                await randomAccessStream.FlushAsync();
+            }
+
+            try
+            {
+                var existingFile = await folder.GetFileAsync(SnapshotFileName);
+                await tempFile.MoveAndReplaceAsync(existingFile);
+            }
+            catch (System.IO.FileNotFoundException)
+            {
+                await tempFile.RenameAsync(SnapshotFileName, NameCollisionOption.ReplaceExisting);
+            }
+            catch
+            {
+                var existingFile = await TryGetFileAsync(folder, SnapshotFileName);
+                if (existingFile != null)
+                {
+                    await tempFile.MoveAndReplaceAsync(existingFile);
+                }
+                else
+                {
+                    await tempFile.RenameAsync(SnapshotFileName, NameCollisionOption.ReplaceExisting);
+                }
             }
 
             BumpSyncStamp();
         }
 
-        private TrayStateSnapshot BuildSnapshot(
+        private static async Task<StorageFile?> TryGetFileAsync(StorageFolder folder, string fileName)
+        {
+            try
+            {
+                return await folder.GetFileAsync(fileName);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private SharedStateSnapshot BuildSnapshot(
             TrayMediaSelectionResult latestResult,
             string statusText,
             bool isMonitoringPaused,
             DateTimeOffset? lastRefreshTime)
         {
-            var snapshot = new TrayStateSnapshot
+            var snapshot = new SharedStateSnapshot
             {
                 StatusText = statusText ?? string.Empty,
                 IsMonitoringPaused = isMonitoringPaused,
@@ -91,19 +128,23 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
             {
                 foreach (var item in latestResult.AllSessions)
                 {
-                    snapshot.Sessions.Add(ConvertSession(item));
+                    var session = ConvertSession(item);
+                    if (session != null)
+                    {
+                        snapshot.Sessions.Add(session);
+                    }
                 }
             }
 
             return snapshot;
         }
 
-        private TrayStateSessionItem ConvertSession(TrayMediaSessionInfo item)
+        private SharedStateSessionItem? ConvertSession(TrayMediaSessionInfo? item)
         {
             if (item == null)
                 return null;
 
-            return new TrayStateSessionItem
+            return new SharedStateSessionItem
             {
                 Order = item.Order,
                 Role = item.Role ?? string.Empty,

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MediaLiveTile.Hybrid.Shared;
+using System;
 using System.Threading.Tasks;
 using Windows.ApplicationModel;
 using Windows.Storage;
@@ -8,7 +9,7 @@ namespace MediaLiveTile.Hybrid.Uwp.Services
     internal sealed class UwpStartupTaskService
     {
         public const string StartupTaskId = "TrayStartupTask";
-        private const string StartupSyncStampKey = "StartupTaskSyncStamp";
+        private static readonly string StartupSyncStampKey = SharedConstants.LocalSettingsKeys.StartupTaskSyncStamp;
 
         public async Task<StartupTaskState> GetStateAsync()
         {
@@ -85,7 +86,7 @@ namespace MediaLiveTile.Hybrid.Uwp.Services
 
         public static long GetSyncStamp()
         {
-            object raw = ApplicationData.Current.LocalSettings.Values[StartupSyncStampKey];
+            object? raw = ApplicationData.Current.LocalSettings.Values[StartupSyncStampKey];
 
             if (raw is long longValue)
                 return longValue;
@@ -98,7 +99,7 @@ namespace MediaLiveTile.Hybrid.Uwp.Services
 
         public static long BumpSyncStamp()
         {
-            long stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            long stamp = GetSyncStamp() + 1;
             ApplicationData.Current.LocalSettings.Values[StartupSyncStampKey] = stamp;
             return stamp;
         }

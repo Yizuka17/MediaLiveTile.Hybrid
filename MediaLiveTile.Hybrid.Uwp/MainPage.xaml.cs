@@ -1,4 +1,6 @@
-﻿using MediaLiveTile.Hybrid.Uwp.Models;
+﻿using MediaLiveTile.Hybrid.Shared;
+using MediaLiveTile.Hybrid.Shared.Models;
+using MediaLiveTile.Hybrid.Uwp.Models;
 using MediaLiveTile.Hybrid.Uwp.Services;
 using System;
 using System.Collections.ObjectModel;
@@ -42,10 +44,10 @@ namespace MediaLiveTile.Hybrid.Uwp
         private int _wideTileTargetIndex;
         private int _largeTileTargetIndex;
 
-        private UwpStateSnapshot _latestSnapshot;
+        private SharedStateSnapshot? _latestSnapshot;
 
-        public ObservableCollection<UwpStateSessionItem> Sessions { get; } =
-            new ObservableCollection<UwpStateSessionItem>();
+        public ObservableCollection<SharedStateSessionItem> Sessions { get; } =
+            new ObservableCollection<SharedStateSessionItem>();
 
         public ObservableCollection<TileTargetOption> TargetOptions { get; } =
             new ObservableCollection<TileTargetOption>();
@@ -78,6 +80,7 @@ namespace MediaLiveTile.Hybrid.Uwp
             bool exists = _secondaryTileService.Exists(kind, targetIndex);
             button.Content = exists ? "已固定" : "固定磁贴";
         }
+
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
@@ -101,6 +104,7 @@ namespace MediaLiveTile.Hybrid.Uwp
             await RefreshStartupUiAsync();
             ApplyMonitoringState(_lastMonitoringPaused);
             await RefreshStateSnapshotUiAsync();
+            ApplyTrayHostLaunchFailureMessage();
         }
 
         private void MainPage_Unloaded(object sender, RoutedEventArgs e)
@@ -129,6 +133,7 @@ namespace MediaLiveTile.Hybrid.Uwp
             {
                 _lastStateSyncStamp = currentStateStamp;
                 await RefreshStateSnapshotUiAsync();
+                ApplyTrayHostLaunchFailureMessage();
             }
 
             UpdatePinButtonTexts();
@@ -275,7 +280,7 @@ namespace MediaLiveTile.Hybrid.Uwp
             try
             {
                 var file = await ApplicationData.Current.LocalFolder.CreateFileAsync(
-                    "MediaLiveTile.log",
+                    SharedConstants.Logging.LogFileName,
                     CreationCollisionOption.OpenIfExists);
 
                 var props = await file.GetBasicPropertiesAsync();
@@ -390,10 +395,22 @@ namespace MediaLiveTile.Hybrid.Uwp
             try
             {
                 var snapshot = await _stateSnapshotService.ReadAsync();
+                if (snapshot == null && _latestSnapshot != null)
+                {
+                    TrayStatusTextBlock.Text = "状态：快照读取失败，保留上次成功状态";
+                    return;
+                }
+
                 ApplyStateSnapshot(snapshot);
             }
             catch (Exception ex)
             {
+                if (_latestSnapshot != null)
+                {
+                    TrayStatusTextBlock.Text = "状态：读取失败，保留上次成功状态 - " + ex.Message;
+                    return;
+                }
+
                 TrayStatusTextBlock.Text = "状态：读取失败 - " + ex.Message;
                 TrayLastRefreshTextBlock.Text = "上次刷新：--";
                 PrimaryMediaTextBlock.Text = "主媒体：无";
@@ -402,6 +419,17 @@ namespace MediaLiveTile.Hybrid.Uwp
 
                 _latestSnapshot = null;
                 UpdatePreviewsFromCurrentSelection();
+            }
+        }
+
+        private void ApplyTrayHostLaunchFailureMessage()
+        {
+            object? raw = ApplicationData.Current.LocalSettings.Values[
+                SharedConstants.LocalSettingsKeys.TrayHostLaunchFailureMessage];
+
+            if (raw is string message && !string.IsNullOrWhiteSpace(message))
+            {
+                TrayStatusTextBlock.Text = message;
             }
         }
 
@@ -444,12 +472,16 @@ namespace MediaLiveTile.Hybrid.Uwp
             }
         }
 
-        private void ApplyStateSnapshot(UwpStateSnapshot snapshot)
+        private void ApplyStateSnapshot(SharedStateSnapshot? snapshot)
         {
-            _latestSnapshot = snapshot;
-
             if (snapshot == null)
             {
+                if (_latestSnapshot != null)
+                {
+                    TrayStatusTextBlock.Text = "状态：暂无新状态快照，保留上次成功状态";
+                    return;
+                }
+
                 TrayStatusTextBlock.Text = "状态：暂无状态快照";
                 TrayLastRefreshTextBlock.Text = "上次刷新：--";
                 PrimaryMediaTextBlock.Text = "主媒体：无";
@@ -459,6 +491,7 @@ namespace MediaLiveTile.Hybrid.Uwp
                 return;
             }
 
+            _latestSnapshot = snapshot;
             TrayStatusTextBlock.Text = "状态：" + (snapshot.StatusText ?? string.Empty);
 
             if (snapshot.HasLastRefreshTime)
@@ -487,7 +520,7 @@ namespace MediaLiveTile.Hybrid.Uwp
             UpdatePreviewsFromCurrentSelection();
         }
 
-        private string BuildMediaSummary(string label, UwpStateSessionItem item)
+        private string BuildMediaSummary(string label, SharedStateSessionItem? item)
         {
             if (item == null || string.IsNullOrWhiteSpace(item.Title))
                 return label + "：无";
@@ -495,7 +528,7 @@ namespace MediaLiveTile.Hybrid.Uwp
             return label + "：" + item.SourceDisplayName + " - " + item.Title;
         }
 
-        private UwpStateSessionItem ResolveMediaByIndex(int index)
+        private SharedStateSessionItem? ResolveMediaByIndex(int index)
         {
             if (_latestSnapshot == null || _latestSnapshot.Sessions == null)
                 return null;
@@ -514,30 +547,30 @@ namespace MediaLiveTile.Hybrid.Uwp
             UpdateLargePreview(ResolveMediaByIndex(_largeTileTargetIndex));
         }
 
-        private void UpdateSmallPreview(UwpStateSessionItem media)
+        private void UpdateSmallPreview(SharedStateSessionItem? media)
         {
             SetPreviewImage(SmallPreviewImage, media != null ? media.ImageUri : null);
         }
 
-        private void UpdateMediumPreview(UwpStateSessionItem media)
+        private void UpdateMediumPreview(SharedStateSessionItem? media)
         {
             SetPreviewImage(MediumCoverPreviewImage, media != null ? media.ImageUri : null);
             ApplyInfoPreview(media, MediumInfoTitleText, MediumInfoArtistText, MediumInfoSourceText);
         }
 
-        private void UpdateWidePreview(UwpStateSessionItem media)
+        private void UpdateWidePreview(SharedStateSessionItem? media)
         {
             SetPreviewImage(WidePreviewImage, media != null ? media.ImageUri : null);
             ApplyInfoPreview(media, WideTitleText, WideArtistText, WideSourceText);
         }
 
-        private void UpdateLargePreview(UwpStateSessionItem media)
+        private void UpdateLargePreview(SharedStateSessionItem? media)
         {
             SetPreviewImage(LargeCoverPreviewImage, media != null ? media.ImageUri : null);
             ApplyInfoPreview(media, LargeInfoTitleText, LargeInfoArtistText, LargeInfoSourceText);
         }
 
-        private void SetPreviewImage(Image image, string imageUri)
+        private void SetPreviewImage(Image image, string? imageUri)
         {
             try
             {
@@ -557,7 +590,7 @@ namespace MediaLiveTile.Hybrid.Uwp
         }
 
         private void ApplyInfoPreview(
-            UwpStateSessionItem media,
+            SharedStateSessionItem? media,
             TextBlock titleText,
             TextBlock artistText,
             TextBlock sourceText)
@@ -575,7 +608,7 @@ namespace MediaLiveTile.Hybrid.Uwp
             sourceText.Text = GetSourceText(media);
         }
 
-        private string GetDisplayTitle(UwpStateSessionItem media)
+        private string GetDisplayTitle(SharedStateSessionItem? media)
         {
             if (media != null && !string.IsNullOrWhiteSpace(media.Title))
                 return media.Title;
@@ -583,7 +616,7 @@ namespace MediaLiveTile.Hybrid.Uwp
             return "当前无媒体";
         }
 
-        private string GetArtistText(UwpStateSessionItem media)
+        private string GetArtistText(SharedStateSessionItem? media)
         {
             if (media == null || string.IsNullOrWhiteSpace(media.Artist) || media.Artist == "无艺人")
                 return string.Empty;
@@ -591,7 +624,7 @@ namespace MediaLiveTile.Hybrid.Uwp
             return media.Artist;
         }
 
-        private string GetSourceText(UwpStateSessionItem media)
+        private string GetSourceText(SharedStateSessionItem? media)
         {
             return media == null ? string.Empty : (media.SourceDisplayName ?? string.Empty);
         }

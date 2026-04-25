@@ -1,13 +1,14 @@
-﻿using Windows.Storage;
+﻿using MediaLiveTile.Hybrid.Shared;
+using Windows.Storage;
 
 namespace MediaLiveTile.Hybrid.TrayHost.Services
 {
     internal static class TrayTileSettingsService
     {
-        private const string SmallTileTargetIndexKey = "SmallTileTargetIndex";
-        private const string MediumTileTargetIndexKey = "MediumTileTargetIndex";
-        private const string WideTileTargetIndexKey = "WideTileTargetIndex";
-        private const string LargeTileTargetIndexKey = "LargeTileTargetIndex";
+        private static readonly string SmallTileTargetIndexKey = SharedConstants.LocalSettingsKeys.SmallTileTargetIndex;
+        private static readonly string MediumTileTargetIndexKey = SharedConstants.LocalSettingsKeys.MediumTileTargetIndex;
+        private static readonly string WideTileTargetIndexKey = SharedConstants.LocalSettingsKeys.WideTileTargetIndex;
+        private static readonly string LargeTileTargetIndexKey = SharedConstants.LocalSettingsKeys.LargeTileTargetIndex;
 
         public static int GetSmallTileTargetIndex() => GetInt(SmallTileTargetIndexKey, 0);
         public static int GetMediumTileTargetIndex() => GetInt(MediumTileTargetIndexKey, 0);

@@ -1,15 +1,15 @@
-﻿using System;
+﻿using MediaLiveTile.Hybrid.Shared;
 using Windows.Storage;
 
 namespace MediaLiveTile.Hybrid.Uwp.Services
 {
     internal sealed class UwpRefreshRequestService
     {
-        private const string RefreshRequestStampKey = "RefreshRequestStamp";
+        private static readonly string RefreshRequestStampKey = SharedConstants.LocalSettingsKeys.RefreshRequestStamp;
 
         public static long GetStamp()
         {
-            object raw = ApplicationData.Current.LocalSettings.Values[RefreshRequestStampKey];
+            object? raw = ApplicationData.Current.LocalSettings.Values[RefreshRequestStampKey];
 
             if (raw is long longValue)
                 return longValue;
@@ -22,7 +22,7 @@ namespace MediaLiveTile.Hybrid.Uwp.Services
 
         public long RequestRefresh()
         {
-            long stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            long stamp = GetStamp() + 1;
             ApplicationData.Current.LocalSettings.Values[RefreshRequestStampKey] = stamp;
             return stamp;
         }

@@ -14,37 +14,61 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
 
         public async Task UpdateMainTileAsync(TrayMediaSelectionResult? result)
         {
-            int smallTargetIndex = TrayTileSettingsService.GetSmallTileTargetIndex();
-            int mediumTargetIndex = TrayTileSettingsService.GetMediumTileTargetIndex();
-            int wideTargetIndex = TrayTileSettingsService.GetWideTileTargetIndex();
-            int largeTargetIndex = TrayTileSettingsService.GetLargeTileTargetIndex();
-
-            var updater = TileUpdateManager.CreateTileUpdaterForApplication();
-
-            await UpdateTileAsync(
-                updater,
-                result,
-                smallTargetIndex,
-                mediumTargetIndex,
-                wideTargetIndex,
-                largeTargetIndex);
-        }
-
-        public async Task UpdateAllSecondaryTilesAsync(TrayMediaSelectionResult? result)
-        {
-            var tiles = await _secondaryTileService.GetManagedTilesAsync();
-
-            foreach (var tile in tiles)
+            try
             {
-                var updater = TileUpdateManager.CreateTileUpdaterForSecondaryTile(tile.TileId);
+                int smallTargetIndex = TrayTileSettingsService.GetSmallTileTargetIndex();
+                int mediumTargetIndex = TrayTileSettingsService.GetMediumTileTargetIndex();
+                int wideTargetIndex = TrayTileSettingsService.GetWideTileTargetIndex();
+                int largeTargetIndex = TrayTileSettingsService.GetLargeTileTargetIndex();
+
+                var updater = TileUpdateManager.CreateTileUpdaterForApplication();
 
                 await UpdateTileAsync(
                     updater,
                     result,
-                    tile.TargetIndex,
-                    tile.TargetIndex,
-                    tile.TargetIndex,
-                    tile.TargetIndex);
+                    smallTargetIndex,
+                    mediumTargetIndex,
+                    wideTargetIndex,
+                    largeTargetIndex);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Update main tile failed: " + ex);
+            }
+        }
+
+        public async Task UpdateAllSecondaryTilesAsync(TrayMediaSelectionResult? result)
+        {
+            IReadOnlyList<ManagedSecondaryTileInfo> tiles;
+
+            try
+            {
+                tiles = await _secondaryTileService.GetManagedTilesAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Find secondary tiles failed: " + ex);
+                return;
+            }
+
+            foreach (var tile in tiles)
+            {
+                try
+                {
+                    var updater = TileUpdateManager.CreateTileUpdaterForSecondaryTile(tile.TileId);
+
+                    await UpdateTileAsync(
+                        updater,
+                        result,
+                        tile.TargetIndex,
+                        tile.TargetIndex,
+                        tile.TargetIndex,
+                        tile.TargetIndex);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Update secondary tile failed: " + tile.TileId + " | " + ex);
+                }
             }
         }
 
@@ -58,10 +82,12 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
         {
             var allSessions = result?.AllSessions;
 
-            var smallItem = await CreateTileItemAsync(ResolveMedia(allSessions, smallTargetIndex));
-            var mediumItem = await CreateTileItemAsync(ResolveMedia(allSessions, mediumTargetIndex));
-            var wideItem = await CreateTileItemAsync(ResolveMedia(allSessions, wideTargetIndex));
-            var largeItem = await CreateTileItemAsync(ResolveMedia(allSessions, largeTargetIndex));
+            long cacheVersion = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            var smallItem = await CreateTileItemAsync(ResolveMedia(allSessions, smallTargetIndex), cacheVersion);
+            var mediumItem = await CreateTileItemAsync(ResolveMedia(allSessions, mediumTargetIndex), cacheVersion);
+            var wideItem = await CreateTileItemAsync(ResolveMedia(allSessions, wideTargetIndex), cacheVersion);
+            var largeItem = await CreateTileItemAsync(ResolveMedia(allSessions, largeTargetIndex), cacheVersion);
 
             var coverXml = BuildCoverTileXml(smallItem, mediumItem, wideItem, largeItem);
             var infoXml = BuildInfoTileXml(smallItem, mediumItem, wideItem, largeItem);
@@ -79,8 +105,16 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
             updater.EnableNotificationQueueForSquare310x310(true);
             updater.EnableNotificationQueueForWide310x150(false);
 
-            updater.Update(new TileNotification(coverDoc));
-            updater.Update(new TileNotification(infoDoc));
+            updater.Update(CreateTileNotification(coverDoc));
+            updater.Update(CreateTileNotification(infoDoc));
+        }
+
+        private TileNotification CreateTileNotification(XmlDocument document)
+        {
+            return new TileNotification(document)
+            {
+                ExpirationTime = DateTimeOffset.Now.AddDays(1)
+            };
         }
 
         private TrayMediaSessionInfo? ResolveMedia(IReadOnlyList<TrayMediaSessionInfo>? allSessions, int index)
@@ -97,11 +131,12 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
             return allSessions[index];
         }
 
-        private Task<TileItem> CreateTileItemAsync(TrayMediaSessionInfo? media)
+        private Task<TileItem> CreateTileItemAsync(TrayMediaSessionInfo? media, long cacheVersion)
         {
             return Task.FromResult(new TileItem
             {
                 ImageUri = GetImageUri(media),
+                ImageCacheVersion = cacheVersion,
                 Title = GetDisplayTitle(media),
                 Artist = GetArtist(media),
                 Source = GetSource(media)
@@ -154,7 +189,7 @@ $@"<tile>
         {
             return
 $@"<binding template='TileSmall' branding='none'>
-    <image src='{EscapeXml(item.ImageUri)}' hint-removeMargin='true'/>
+    <image src='{EscapeXml(GetVersionedImageUri(item))}' hint-removeMargin='true'/>
 </binding>";
         }
 
@@ -162,7 +197,7 @@ $@"<binding template='TileSmall' branding='none'>
         {
             return
 $@"<binding template='TileMedium' branding='none'>
-    <image src='{EscapeXml(item.ImageUri)}' placement='background'/>
+    <image src='{EscapeXml(GetVersionedImageUri(item))}' placement='background'/>
 </binding>";
         }
 
@@ -182,7 +217,7 @@ $@"<binding template='TileMedium' branding='none'>
 $@"<binding template='TileWide' branding='none'>
     <group>
         <subgroup hint-weight='50'>
-            <image src='{EscapeXml(item.ImageUri)}' hint-removeMargin='true'/>
+            <image src='{EscapeXml(GetVersionedImageUri(item))}' hint-removeMargin='true'/>
         </subgroup>
         <subgroup hint-weight='50'>
             <text hint-style='subtitle' hint-wrap='true' hint-maxLines='2'>{EscapeXml(item.Title)}</text>
@@ -197,7 +232,7 @@ $@"<binding template='TileWide' branding='none'>
         {
             return
 $@"<binding template='TileLarge' branding='none'>
-    <image src='{EscapeXml(item.ImageUri)}' placement='background'/>
+    <image src='{EscapeXml(GetVersionedImageUri(item))}' placement='background'/>
 </binding>";
         }
 
@@ -244,6 +279,15 @@ $@"<binding template='TileLarge' branding='none'>
                 : media.SourceDisplayName;
         }
 
+        private string GetVersionedImageUri(TileItem item)
+        {
+            if (string.IsNullOrWhiteSpace(item.ImageUri))
+                return DefaultImageUri;
+
+            string separator = item.ImageUri.Contains("?") ? "&" : "?";
+            return item.ImageUri + separator + "v=" + item.ImageCacheVersion.ToString();
+        }
+
         private string EscapeXml(string text)
         {
             if (string.IsNullOrEmpty(text))
@@ -260,6 +304,7 @@ $@"<binding template='TileLarge' branding='none'>
         private sealed class TileItem
         {
             public string ImageUri { get; set; } = string.Empty;
+            public long ImageCacheVersion { get; set; }
             public string Title { get; set; } = string.Empty;
             public string Artist { get; set; } = string.Empty;
             public string Source { get; set; } = string.Empty;

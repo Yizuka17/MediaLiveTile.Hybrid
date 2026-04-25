@@ -1,4 +1,5 @@
-﻿using MediaLiveTile.Hybrid.Uwp.Models;
+﻿using MediaLiveTile.Hybrid.Shared;
+using MediaLiveTile.Hybrid.Shared.Models;
 using System;
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -11,13 +12,13 @@ namespace MediaLiveTile.Hybrid.Uwp.Services
 {
     internal sealed class UwpStateSnapshotService
     {
-        private const string SnapshotFolderName = "Shared";
-        private const string SnapshotFileName = "CurrentState.json";
-        private const string StateSnapshotSyncStampKey = "StateSnapshotSyncStamp";
+        private static readonly string SnapshotFolderName = SharedConstants.StateSnapshot.FolderName;
+        private static readonly string SnapshotFileName = SharedConstants.StateSnapshot.FileName;
+        private static readonly string StateSnapshotSyncStampKey = SharedConstants.LocalSettingsKeys.StateSnapshotSyncStamp;
 
         public static long GetSyncStamp()
         {
-            object raw = ApplicationData.Current.LocalSettings.Values[StateSnapshotSyncStampKey];
+            object? raw = ApplicationData.Current.LocalSettings.Values[StateSnapshotSyncStampKey];
 
             if (raw is long longValue)
                 return longValue;
@@ -28,7 +29,14 @@ namespace MediaLiveTile.Hybrid.Uwp.Services
             return 0L;
         }
 
-        public async Task<UwpStateSnapshot> ReadAsync()
+        public static long BumpSyncStamp()
+        {
+            long stamp = GetSyncStamp() + 1;
+            ApplicationData.Current.LocalSettings.Values[StateSnapshotSyncStampKey] = stamp;
+            return stamp;
+        }
+
+        public async Task<SharedStateSnapshot?> ReadAsync()
         {
             try
             {
@@ -37,13 +45,12 @@ namespace MediaLiveTile.Hybrid.Uwp.Services
                     CreationCollisionOption.OpenIfExists);
 
                 var file = await folder.GetFileAsync(SnapshotFileName);
-                var serializer = new DataContractJsonSerializer(typeof(UwpStateSnapshot));
+                var serializer = new DataContractJsonSerializer(typeof(SharedStateSnapshot));
 
                 using (IRandomAccessStream randomAccessStream = await file.OpenAsync(FileAccessMode.Read))
                 using (var stream = randomAccessStream.AsStreamForRead())
                 {
-                    var result = serializer.ReadObject(stream) as UwpStateSnapshot;
-                    return result;
+                    return serializer.ReadObject(stream) as SharedStateSnapshot;
                 }
             }
             catch

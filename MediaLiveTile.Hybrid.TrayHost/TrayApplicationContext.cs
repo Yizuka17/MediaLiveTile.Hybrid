@@ -1,4 +1,5 @@
-﻿using MediaLiveTile.Hybrid.TrayHost.Services;
+﻿using MediaLiveTile.Hybrid.Shared;
+using MediaLiveTile.Hybrid.TrayHost.Services;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -6,6 +7,7 @@ using System.Drawing;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Windows.ApplicationModel;
+using Windows.Storage;
 using Windows.System;
 
 namespace MediaLiveTile.Hybrid.TrayHost
@@ -90,7 +92,7 @@ namespace MediaLiveTile.Hybrid.TrayHost
             try
             {
                 var assembly = typeof(TrayApplicationContext).Assembly;
-                string resourceName = null;
+                string? resourceName = null;
 
                 foreach (var name in assembly.GetManifestResourceNames())
                 {
@@ -125,6 +127,9 @@ namespace MediaLiveTile.Hybrid.TrayHost
             try
             {
                 _lastRefreshRequestStamp = _refreshRequestService.GetStamp();
+                ApplicationData.Current.LocalSettings.Values.Remove(
+                    SharedConstants.LocalSettingsKeys.TrayHostLaunchFailureMessage);
+                TrayStateSnapshotService.BumpSyncStamp();
 
                 await _logService.InfoAsync("TrayHost 启动");
                 await _mediaWatcherService.InitializeAsync();
@@ -461,9 +466,7 @@ namespace MediaLiveTile.Hybrid.TrayHost
                 if (_mediaWatcherService.IsRefreshing)
                     return;
 
-                var primary = _mediaWatcherService.LatestResult != null
-                    ? _mediaWatcherService.LatestResult.PrimaryMedia
-                    : null;
+                var primary = _mediaWatcherService.LatestResult.PrimaryMedia;
 
                 string signature = primary == null
                     ? "<none>"
@@ -511,9 +514,7 @@ namespace MediaLiveTile.Hybrid.TrayHost
             }
             else
             {
-                var primary = _mediaWatcherService.LatestResult != null
-                    ? _mediaWatcherService.LatestResult.PrimaryMedia
-                    : null;
+                var primary = _mediaWatcherService.LatestResult.PrimaryMedia;
 
                 if (primary == null)
                 {
@@ -536,9 +537,7 @@ namespace MediaLiveTile.Hybrid.TrayHost
                 return;
             }
 
-            var primary = _mediaWatcherService.LatestResult != null
-                ? _mediaWatcherService.LatestResult.PrimaryMedia
-                : null;
+            var primary = _mediaWatcherService.LatestResult.PrimaryMedia;
 
             if (primary == null)
             {
@@ -584,6 +583,7 @@ namespace MediaLiveTile.Hybrid.TrayHost
                 _syncTimer.Dispose();
 
                 _mediaWatcherService.StateChanged -= MediaWatcherService_StateChanged;
+                _mediaWatcherService.Dispose();
 
                 _notifyIcon.Visible = false;
                 _notifyIcon.Dispose();

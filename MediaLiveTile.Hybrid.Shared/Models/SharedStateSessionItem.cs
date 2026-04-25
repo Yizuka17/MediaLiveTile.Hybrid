@@ -1,9 +1,9 @@
-﻿using System.Runtime.Serialization;
+using System.Runtime.Serialization;
 
-namespace MediaLiveTile.Hybrid.Uwp.Models
+namespace MediaLiveTile.Hybrid.Shared.Models
 {
     [DataContract]
-    public sealed class UwpStateSessionItem
+    public sealed class SharedStateSessionItem
     {
         [DataMember(Order = 1)]
         public int Order { get; set; }

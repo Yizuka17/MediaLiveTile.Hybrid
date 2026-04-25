@@ -1,14 +1,15 @@
-﻿using Windows.Storage;
+﻿using MediaLiveTile.Hybrid.Shared;
+using Windows.Storage;
 
 namespace MediaLiveTile.Hybrid.TrayHost.Services
 {
     internal sealed class TrayMonitoringStateService
     {
-        private const string MonitoringPausedKey = "MonitoringPaused";
+        private static readonly string MonitoringPausedKey = SharedConstants.LocalSettingsKeys.MonitoringPaused;
 
         public bool IsPaused()
         {
-            object raw = ApplicationData.Current.LocalSettings.Values[MonitoringPausedKey];
+            object? raw = ApplicationData.Current.LocalSettings.Values[MonitoringPausedKey];
 
             if (raw is bool boolValue)
                 return boolValue;

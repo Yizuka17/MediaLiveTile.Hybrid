@@ -19,10 +19,10 @@ namespace MediaLiveTile.Hybrid.TrayHost.Models
         public long LastRefreshUnixTimeMilliseconds { get; set; }
 
         [DataMember(Order = 5)]
-        public TrayStateSessionItem PrimaryMedia { get; set; }
+        public TrayStateSessionItem? PrimaryMedia { get; set; }
 
         [DataMember(Order = 6)]
-        public TrayStateSessionItem SecondaryMedia { get; set; }
+        public TrayStateSessionItem? SecondaryMedia { get; set; }
 
         [DataMember(Order = 7)]
         public List<TrayStateSessionItem> Sessions { get; set; } = new List<TrayStateSessionItem>();

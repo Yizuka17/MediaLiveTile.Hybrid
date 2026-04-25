@@ -1,14 +1,15 @@
-﻿using Windows.Storage;
+﻿using MediaLiveTile.Hybrid.Shared;
+using Windows.Storage;
 
 namespace MediaLiveTile.Hybrid.TrayHost.Services
 {
     internal sealed class TrayRefreshRequestService
     {
-        private const string RefreshRequestStampKey = "RefreshRequestStamp";
+        private static readonly string RefreshRequestStampKey = SharedConstants.LocalSettingsKeys.RefreshRequestStamp;
 
         public long GetStamp()
         {
-            object raw = ApplicationData.Current.LocalSettings.Values[RefreshRequestStampKey];
+            object? raw = ApplicationData.Current.LocalSettings.Values[RefreshRequestStampKey];
 
             if (raw is long longValue)
                 return longValue;

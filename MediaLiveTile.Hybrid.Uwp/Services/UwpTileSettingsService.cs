@@ -1,13 +1,14 @@
-﻿using Windows.Storage;
+﻿using MediaLiveTile.Hybrid.Shared;
+using Windows.Storage;
 
 namespace MediaLiveTile.Hybrid.Uwp.Services
 {
     internal sealed class UwpTileSettingsService
     {
-        private const string SmallTileTargetIndexKey = "SmallTileTargetIndex";
-        private const string MediumTileTargetIndexKey = "MediumTileTargetIndex";
-        private const string WideTileTargetIndexKey = "WideTileTargetIndex";
-        private const string LargeTileTargetIndexKey = "LargeTileTargetIndex";
+        private static readonly string SmallTileTargetIndexKey = SharedConstants.LocalSettingsKeys.SmallTileTargetIndex;
+        private static readonly string MediumTileTargetIndexKey = SharedConstants.LocalSettingsKeys.MediumTileTargetIndex;
+        private static readonly string WideTileTargetIndexKey = SharedConstants.LocalSettingsKeys.WideTileTargetIndex;
+        private static readonly string LargeTileTargetIndexKey = SharedConstants.LocalSettingsKeys.LargeTileTargetIndex;
 
         public int GetSmallTileTargetIndex() => GetInt(SmallTileTargetIndexKey, 0);
         public int GetMediumTileTargetIndex() => GetInt(MediumTileTargetIndexKey, 0);
@@ -21,7 +22,7 @@ namespace MediaLiveTile.Hybrid.Uwp.Services
 
         private int GetInt(string key, int defaultValue)
         {
-            object raw = ApplicationData.Current.LocalSettings.Values[key];
+            object? raw = ApplicationData.Current.LocalSettings.Values[key];
 
             if (raw is int intValue)
                 return intValue;
