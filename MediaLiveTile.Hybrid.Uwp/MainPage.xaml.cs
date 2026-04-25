@@ -488,7 +488,7 @@ namespace MediaLiveTile.Hybrid.Uwp
                 SecondaryMediaTextBlock.Text = "次媒体：无";
                 Sessions.Clear();
                 UpdatePreviewsFromCurrentSelection();
-                return;
+                                return;
             }
 
             _latestSnapshot = snapshot;
@@ -496,7 +496,10 @@ namespace MediaLiveTile.Hybrid.Uwp
 
             if (snapshot.HasLastRefreshTime)
             {
-                var time = DateTimeOffset.FromUnixTimeMilliseconds(snapshot.LastRefreshUnixTimeMilliseconds);
+                var time = DateTimeOffset
+                    .FromUnixTimeMilliseconds(snapshot.LastRefreshUnixTimeMilliseconds)
+                    .ToLocalTime();
+
                 TrayLastRefreshTextBlock.Text = "上次刷新：" + time.ToString("HH:mm:ss");
             }
             else

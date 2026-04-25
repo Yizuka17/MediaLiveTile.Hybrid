@@ -40,7 +40,7 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
 
         public async Task WriteAsync(
             TrayMediaSelectionResult latestResult,
-            string statusText,
+                        string statusText,
             bool isMonitoringPaused,
             DateTimeOffset? lastRefreshTime)
         {
@@ -108,17 +108,19 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
 
         private SharedStateSnapshot BuildSnapshot(
             TrayMediaSelectionResult latestResult,
-            string statusText,
+                        string statusText,
             bool isMonitoringPaused,
             DateTimeOffset? lastRefreshTime)
         {
+            DateTimeOffset? systemLastRefreshTime = lastRefreshTime?.ToLocalTime();
+
             var snapshot = new SharedStateSnapshot
             {
                 StatusText = statusText ?? string.Empty,
                 IsMonitoringPaused = isMonitoringPaused,
-                HasLastRefreshTime = lastRefreshTime.HasValue,
-                LastRefreshUnixTimeMilliseconds = lastRefreshTime.HasValue
-                    ? lastRefreshTime.Value.ToUnixTimeMilliseconds()
+                HasLastRefreshTime = systemLastRefreshTime.HasValue,
+                LastRefreshUnixTimeMilliseconds = systemLastRefreshTime.HasValue
+                    ? systemLastRefreshTime.Value.ToUnixTimeMilliseconds()
                     : 0L,
                 PrimaryMedia = ConvertSession(latestResult?.PrimaryMedia),
                 SecondaryMedia = ConvertSession(latestResult?.SecondaryMedia)

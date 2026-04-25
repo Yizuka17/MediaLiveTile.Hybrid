@@ -82,7 +82,7 @@ namespace MediaLiveTile.Hybrid.TrayHost.Services
         {
             var allSessions = result?.AllSessions;
 
-            long cacheVersion = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            long cacheVersion = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 
             var smallItem = await CreateTileItemAsync(ResolveMedia(allSessions, smallTargetIndex), cacheVersion);
             var mediumItem = await CreateTileItemAsync(ResolveMedia(allSessions, mediumTargetIndex), cacheVersion);
