@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.0.1.0-preview
+## v2.0.1.0
 
 稳定性与体验修补版本。
 
@@ -22,7 +22,7 @@
 
 ### 说明
 
-- 该版本仍为 preview。
+- 该版本为 2.0 混合架构路线的稳定性修补版本。
 - VS2022 调试 UWP + FullTrust 混合项目时，如遇调试期 `SEHException`，建议关闭 XAML 热重载后再调试。
 - 最终运行表现建议以 MSIX Package 部署运行结果为准。
 
